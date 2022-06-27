@@ -1,4 +1,3 @@
-from turtle import up
 import pandas as pd
 import streamlit as st
 from st_aggrid import AgGrid, GridUpdateMode
