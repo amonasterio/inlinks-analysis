@@ -1,5 +1,8 @@
 import pandas as pd
 import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 from st_aggrid import AgGrid, GridUpdateMode
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
@@ -10,6 +13,13 @@ st.set_page_config(
 
 
 st.title("Análisis de enlaces")
+
+@st.cache
+def getRutaDominio(url):
+    parsed = urlparse(url)
+    absolute_rute=parsed.scheme+'://'+parsed.netloc
+    return absolute_rute
+
 @st.cache
 def getInlinksPorURL(df):
     df_agrupado=df.groupby(['Destination','Follow','Status Code']).count()['Source'].reset_index(name="count")
@@ -23,6 +33,56 @@ def getInlinksPorURL(df):
     result['Count Follow'] = result['Count Follow'].fillna(0).astype(int)
     result['Count Nofollow'] = result['Count Nofollow'].fillna(0).astype(int)
     return result
+
+@st.cache
+def getOportunidades(df_oportunidades,ruta_abosoluta):
+    df_salida=None
+    if df_oportunidades is not None:
+        list_keywords = df_oportunidades.values.tolist()
+        list_urls = []
+        for x in list_keywords:
+            list_urls.append(x[6])
+        #Todas las URL que rankean 
+        list_urls = list(dict.fromkeys(list_urls))
+        list_keyword_url = []
+        for x in list_keywords:
+            list_keyword_url.append([x[6],x[0],x[1],x[3]])
+
+        absolute_rute=ruta_abosoluta
+        internal_linking_opportunities = []
+        for iteration in list_urls:
+        
+            page = requests.get(iteration)
+      
+            soup = BeautifulSoup(page.text, 'html.parser')
+            paragraphs = soup.find_all('p')
+            paragraphs = [x.text for x in paragraphs]
+            
+            links = []
+            for link in soup.findAll('a'):
+                links.append(link.get('href'))
+            
+            for x in list_keyword_url:
+                for y in paragraphs:
+                    kw_compara=" " + x[1].lower() + " "
+                    compara=" " + y.lower().replace(",","").replace(".","").replace(";","").replace("?","").replace("!","") + " "
+                    if kw_compara in compara and iteration != x[0]:
+                        links_presence = False
+                        for z in links:
+                            try:
+                                if x[0].replace(absolute_rute,"") == z.replace(absolute_rute,""):
+                                    links_presence = True
+                            except AttributeError:
+                                pass
+
+                        if links_presence == False:
+                            internal_linking_opportunities.append([x[1],y,iteration,x[0], "False", x[2],x[3]])
+                        else:
+                            internal_linking_opportunities.append([x[1],y,iteration,x[0], "True", x[2],x[3]]) 
+        df_salida=pd.DataFrame(internal_linking_opportunities, columns = ["Keyword", "Text", "Source URL", "Target URL", "Link Presence", "Keyword Position", "Search Volume"])
+    return df_salida
+
+
 
 f_entrada=st.file_uploader('CSV con datos exportados de Screaming Frog (all_inlinks.csv)', type='csv')
 if f_entrada is not None:
@@ -62,5 +122,18 @@ if f_entrada is not None:
         gridoptions_enlaces=gb_enlaces.build()
         st.subheader('Enlaces apuntando a destinos seleccionados')
         grid_table_enlaces=AgGrid(df,gridOptions=gridoptions_enlaces,enable_enterprise_modules=True)
-
- 
+        
+        #Buscamos oportunidades de ampliar enlaces entrantes
+        st.subheader('Posibilidad de inlinks')
+        f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
+        if f_semrush is not None:
+            df_semrush=pd.read_csv(f_semrush)
+            ruta_dominio=getRutaDominio(filtro[0])
+            print(ruta_dominio)
+            df_salida=getOportunidades(df_semrush,ruta_dominio)
+            #Dejamos únicamente las URL que hemos seleccionado antes, ya que son en las que quermos generar enlaces
+            boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
+            df_salida=df_salida[boolean_oportunidades]
+            #lista_url_queremos_enlaces=df_oportunidades['URL'].to_list()
+            AgGrid(df_salida)
+            
