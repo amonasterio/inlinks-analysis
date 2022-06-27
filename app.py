@@ -51,6 +51,9 @@ if f_entrada is not None:
             destino=i["Destination"]
             filtro.append(destino)
         df = df_filtrado.drop(columns=["Type","Size (Bytes)","Status","Target","Path Type","Link Position"])
+        df["Rel"]=df["Rel"].fillna('').astype(str)
+        df["Alt Text"]=df["Alt Text"].fillna('').astype(str)
+        df["Anchor"]=df["Anchor"].fillna('').astype(str)
         boolean_series = df["Destination"].isin(filtro) 
         df=df[boolean_series]
         gb_enlaces=GridOptionsBuilder.from_dataframe(df)
