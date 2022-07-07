@@ -1,4 +1,5 @@
 import pandas as pd
+from pyrsistent import l
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,12 @@ st.set_page_config(
 
 
 st.title("Análisis de enlaces")
+
+@st.cache
+def getUrlSinEnlaces(df_html,inlinks_contenido):
+    df_sin_enlaces=df_html[(~df_html["Address"].isin(inlinks_contenido))&(df_html["Status Code"]==200)]
+    return df_sin_enlaces
+
 
 @st.cache
 def getRutaDominio(url):
@@ -33,6 +40,20 @@ def getInlinksPorURL(df):
     result['Count Follow'] = result['Count Follow'].fillna(0).astype(int)
     result['Count Nofollow'] = result['Count Nofollow'].fillna(0).astype(int)
     return result
+
+def pintaTabla(df_pinta, grid_update, selection):
+    gb=GridOptionsBuilder.from_dataframe(df_pinta)
+    gb.configure_pagination()
+    gb.configure_side_bar()  
+    if selection:
+        gb.configure_selection(selection_mode='multiple',use_checkbox=True)
+    gb.configure_default_column(groupable=True, enableRowGroup=True, aggFunc="count")
+    grid_options=gb.build()
+    if grid_update:
+        grid_table=AgGrid(df_pinta,gridOptions=grid_options,update_mode=GridUpdateMode.SELECTION_CHANGED,enable_enterprise_modules=True, editable=True)  
+    else:
+        grid_table=AgGrid(df_pinta,gridOptions=grid_options,enable_enterprise_modules=True, editable=True)  
+    return grid_table
 
 @st.cache
 def getOportunidades(df_oportunidades,ruta_abosoluta):
@@ -84,56 +105,58 @@ def getOportunidades(df_oportunidades,ruta_abosoluta):
 
 
 
-f_entrada=st.file_uploader('CSV con datos exportados de Screaming Frog (all_inlinks.csv)', type='csv')
-if f_entrada is not None:
-    df_filtrado=pd.read_csv(f_entrada)
-    df_mask=(df_filtrado['Type']=='Hyperlink')&(df_filtrado['Link Position']=='Content')&(df_filtrado['Source']!=df_filtrado['Destination'])
-    df_filtrado=df_filtrado[df_mask]
-    
-    result=getInlinksPorURL(df_filtrado)
-    
-
-    gb=GridOptionsBuilder.from_dataframe(result)
-    gb.configure_pagination()
-    gb.configure_side_bar()
-    #sel_mode=st.radio('Selection type', options=['single','multiple'])   
-    gb.configure_selection(selection_mode='multiple',use_checkbox=True)
-    gb.configure_default_column(groupable=True, enableRowGroup=True, aggFunc="count")
-    gridoptions=gb.build()
-    st.subheader('Resumen de enlaces')
-    grid_table=AgGrid(result,height=600,gridOptions=gridoptions,update_mode=GridUpdateMode.SELECTION_CHANGED,enable_enterprise_modules=True)  
-    sel_rows=grid_table['selected_rows']
-    #st.write(sel_rows)
-    if len(sel_rows) > 0:
-        #Filtramos la URL seleccionada en el dataframe con todos los enlaces
-        filtro=[]
-        for i in sel_rows:
-            destino=i["Destination"]
-            filtro.append(destino)
-        df = df_filtrado.drop(columns=["Type","Size (Bytes)","Status","Target","Path Type","Link Position"])
-        df["Rel"]=df["Rel"].fillna('').astype(str)
-        df["Alt Text"]=df["Alt Text"].fillna('').astype(str)
-        df["Anchor"]=df["Anchor"].fillna('').astype(str)
-        boolean_series = df["Destination"].isin(filtro) 
-        df=df[boolean_series]
-        gb_enlaces=GridOptionsBuilder.from_dataframe(df)
-        gb_enlaces.configure_side_bar()
-        gb_enlaces.configure_default_column(groupable=True, enableRowGroup=True, aggFunc="count", editable=True)
-        gridoptions_enlaces=gb_enlaces.build()
-        st.subheader('Enlaces apuntando a destinos seleccionados')
-        grid_table_enlaces=AgGrid(df,gridOptions=gridoptions_enlaces,enable_enterprise_modules=True)
+f_inlinks=st.file_uploader('CSV con datos exportados de Screaming Frog (all_inlinks.csv)', type='csv')
+f_internal=st.file_uploader('CSV con datos exportados de Screaming Frog (internal_html.csv)', type='csv')
+if f_inlinks is not None:
+    if f_internal is not None:
+        df_inlinks=pd.read_csv(f_inlinks)
+        df_internal=pd.read_csv(f_internal)
         
-        #Buscamos oportunidades de ampliar enlaces entrantes
-        st.subheader('Posibilidad de inlinks')
-        f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
-        if f_semrush is not None:
-            df_semrush=pd.read_csv(f_semrush)
-            ruta_dominio=getRutaDominio(filtro[0])
-            print(ruta_dominio)
-            df_salida=getOportunidades(df_semrush,ruta_dominio)
-            #Dejamos únicamente las URL que hemos seleccionado antes, ya que son en las que quermos generar enlaces
-            boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
-            df_salida=df_salida[boolean_oportunidades]
-            #lista_url_queremos_enlaces=df_oportunidades['URL'].to_list()
-            AgGrid(df_salida)
+        #filtramos para dejar únicamente enlaces en el contenido que apunten a URL distintas de la origen
+        df_mask=(df_inlinks['Type']=='Hyperlink')&(df_inlinks['Link Position']=='Content')&(df_inlinks['Source']!=df_inlinks['Destination'])
+        df_inlinks_contenido=df_inlinks[df_mask]
+    
+        l_inlinks_contenidos=df_inlinks_contenido["Destination"].to_list()
+        df_url_sin_enlaces=getUrlSinEnlaces(df_internal,l_inlinks_contenidos)
+        st.subheader('URL sin inlinks en contenido')
+        grid_table_url_sin_enlaces=pintaTabla(df_url_sin_enlaces, True, True)
+    
+        st.subheader('Resumen de inlinks en contenido')
+        df_resumen=getInlinksPorURL(df_inlinks_contenido)
+        grid_table_resumen=pintaTabla(df_resumen, True, True) 
+        
+        sel_rows=grid_table_resumen['selected_rows']
+        #st.write(sel_rows)
+        if len(sel_rows) > 0:
+            #Filtramos la URL seleccionada en el dataframe con todos los enlaces
+            filtro=[]
+            for i in sel_rows:
+                destino=i["Destination"]
+                filtro.append(destino)
+            #Eliminamos columnas que no nos interesas
+            df_inlinks_contenido = df_inlinks_contenido.drop(columns=["Type","Size (Bytes)","Status","Target","Path Type","Link Position"])
+            df_inlinks_contenido["Rel"]=df_inlinks_contenido["Rel"].fillna('').astype(str)
+            df_inlinks_contenido["Alt Text"]=df_inlinks_contenido["Alt Text"].fillna('').astype(str)
+            df_inlinks_contenido["Anchor"]=df_inlinks_contenido["Anchor"].fillna('').astype(str)
+            boolean_series = df_inlinks_contenido["Destination"].isin(filtro) 
+            df_inlinks_seleccionados=df_inlinks_contenido[boolean_series]
             
+            st.subheader('Enlaces apuntando a destinos seleccionados')
+
+            grid_table_enlaces=pintaTabla(df_inlinks_seleccionados,False, False)
+            
+
+            #Buscamos oportunidades de ampliar enlaces entrantes
+            st.subheader('Posibilidad de inlinks')
+            f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
+            if f_semrush is not None:
+                df_semrush=pd.read_csv(f_semrush)
+                ruta_dominio=getRutaDominio(filtro[0])
+                print(ruta_dominio)
+                df_salida=getOportunidades(df_semrush,ruta_dominio)
+                #Dejamos únicamente las URL que hemos seleccionado antes, ya que son en las que quermos generar enlaces
+                boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
+                df_salida=df_salida[boolean_oportunidades]
+                #lista_url_queremos_enlaces=df_oportunidades['URL'].to_list()
+                AgGrid(df_salida)
+                
