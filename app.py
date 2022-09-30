@@ -111,7 +111,7 @@ if f_inlinks is not None:
     if f_internal is not None:
         df_inlinks=pd.read_csv(f_inlinks)
         df_internal=pd.read_csv(f_internal)
-        
+  
         #filtramos para dejar únicamente enlaces en el contenido que apunten a URL distintas de la origen
         df_mask=(df_inlinks['Type']=='Hyperlink')&(df_inlinks['Link Position']=='Content')&(df_inlinks['Source']!=df_inlinks['Destination'])
         df_inlinks_contenido=df_inlinks[df_mask]
@@ -147,16 +147,16 @@ if f_inlinks is not None:
             
 
             #Buscamos oportunidades de ampliar enlaces entrantes
-            st.subheader('Posibilidad de inlinks')
-            f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
-            if f_semrush is not None:
-                df_semrush=pd.read_csv(f_semrush)
-                ruta_dominio=getRutaDominio(filtro[0])
-                print(ruta_dominio)
-                df_salida=getOportunidades(df_semrush,ruta_dominio)
+            #st.subheader('Posibilidad de inlinks')
+            #f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
+            #if f_semrush is not None:
+                #df_semrush=pd.read_csv(f_semrush)
+                #ruta_dominio=getRutaDominio(filtro[0])
+                #print(ruta_dominio)
+                #df_salida=getOportunidades(df_semrush,ruta_dominio)
                 #Dejamos únicamente las URL que hemos seleccionado antes, ya que son en las que quermos generar enlaces
-                boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
-                df_salida=df_salida[boolean_oportunidades]
-                #lista_url_queremos_enlaces=df_oportunidades['URL'].to_list()
-                AgGrid(df_salida)
+                #boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
+                #df_salida=df_salida[boolean_oportunidades]
+         
+                #AgGrid(df_salida)
                 
