@@ -1,5 +1,4 @@
 import pandas as pd
-from pyrsistent import l
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
