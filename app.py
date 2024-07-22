@@ -125,16 +125,10 @@ if f_inlinks is not None:
         grid_table_resumen=pintaTabla(df_resumen, True, True) 
         
         sel_rows=grid_table_resumen['selected_rows']
-        #st.write(sel_rows)
         if len(sel_rows) > 0:
             #Filtramos la URL seleccionada en el dataframe con todos los enlaces
             filtro=[]
-            st.write(sel_rows['Destination'])
-            #for row in sel_rows:
-            #    destino=sel_rows['Destination']
-            #    filtro.append(destino[0])
             filtro=sel_rows['Destination']
-            st.write(filtro)
             #Eliminamos columnas que no nos interesas
             df_inlinks_contenido = df_inlinks_contenido.drop(columns=["Type","Size (Bytes)","Status","Target","Path Type","Link Position"])
             df_inlinks_contenido["Rel"]=df_inlinks_contenido["Rel"].fillna('').astype(str)
