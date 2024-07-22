@@ -129,9 +129,12 @@ if f_inlinks is not None:
         if len(sel_rows) > 0:
             #Filtramos la URL seleccionada en el dataframe con todos los enlaces
             filtro=[]
-            for i in sel_rows:
-                destino=i["Destination"]
-                filtro.append(destino)
+            st.write(sel_rows['Destination'])
+            #for row in sel_rows:
+            #    destino=sel_rows['Destination']
+            #    filtro.append(destino[0])
+            filtro=sel_rows['Destination']
+            st.write(filtro)
             #Eliminamos columnas que no nos interesas
             df_inlinks_contenido = df_inlinks_contenido.drop(columns=["Type","Size (Bytes)","Status","Target","Path Type","Link Position"])
             df_inlinks_contenido["Rel"]=df_inlinks_contenido["Rel"].fillna('').astype(str)
@@ -144,18 +147,3 @@ if f_inlinks is not None:
 
             grid_table_enlaces=pintaTabla(df_inlinks_seleccionados,False, False)
             
-
-            #Buscamos oportunidades de ampliar enlaces entrantes
-            #st.subheader('Posibilidad de inlinks')
-            #f_semrush=st.file_uploader('CSV con datos exportados de Semrush', type='csv')
-            #if f_semrush is not None:
-                #df_semrush=pd.read_csv(f_semrush)
-                #ruta_dominio=getRutaDominio(filtro[0])
-                #print(ruta_dominio)
-                #df_salida=getOportunidades(df_semrush,ruta_dominio)
-                #Dejamos únicamente las URL que hemos seleccionado antes, ya que son en las que quermos generar enlaces
-                #boolean_oportunidades = df_salida["Target URL"].isin(filtro) 
-                #df_salida=df_salida[boolean_oportunidades]
-         
-                #AgGrid(df_salida)
-                
